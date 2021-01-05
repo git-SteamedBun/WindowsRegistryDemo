@@ -1,4 +1,4 @@
-#include "widget.h"
+﻿#include "widget.h"
 #include "ui_widget.h"
 
 #include <stdio.h>
@@ -15,10 +15,7 @@ Widget::Widget(QWidget *parent)
 {
     ui->setupUi(this);
     initReg();
-    QString key, value;
-    getAutoRun(&key, &value);
-    ui->keyLabel->setText(key);
-    ui->valueLabel->setText(value);
+    showKeyValue();
     setConnect();
     ui->pathLabel->setText("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run");
 }
@@ -53,13 +50,28 @@ bool Widget::isAutoRun()
     return true;
 }
 
+void Widget::showKeyValue()
+{
+    QString key, value;
+    getAutoRun(&key, &value);
+    ui->keyLabel->setText(key);
+    ui->valueLabel->setText(value);
+}
+
 void Widget::setTip(unsigned long error, const QString &tipHead)
 {
-    LPVOID lpMsgBuf;
-    FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER, nullptr, error, 0, (LPWSTR)&lpMsgBuf, 0, nullptr);
-    QString strMessage = QString::fromStdWString(static_cast<LPWSTR>(lpMsgBuf));
+    QString strMessage = QStringLiteral(" 操作成功 ");
+    ui->tipLabel->setText("");
+    if(error != ERROR_SUCCESS)
+    {
+        LPVOID lpMsgBuf;
+        FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER, nullptr, error, 0, (LPWSTR)&lpMsgBuf, 0, nullptr);
+        QString strMessage = QString::fromStdWString(static_cast<LPWSTR>(lpMsgBuf));
+        ui->tipLabel->setText(tipHead + strMessage);
+    }
+
     qDebug() << tipHead + strMessage;
-    ui->tipLabel->setText(tipHead + strMessage);
+
 }
 
 void Widget::setConnect()
@@ -68,10 +80,7 @@ void Widget::setConnect()
         setAutoRun();
     });
     connect(ui->readBtn, &QPushButton::clicked, this, [this](){
-        QString key, value;
-        getAutoRun(&key, &value);
-        ui->keyLabel->setText(key);
-        ui->valueLabel->setText(value);
+        showKeyValue();
     });
     connect(ui->removeBtn, &QPushButton::clicked, this, [this](){
         if(isAutoRun())
@@ -95,7 +104,7 @@ void Widget::initReg()
                 nullptr,
                 &phkResult,
                 &dwDisposition);
-    setTip(lReg, "initReg");
+    setTip(lReg, "init");
     closeRegKey();
 }
 
@@ -118,9 +127,9 @@ void Widget::setAutoRun()
 
     QString tempValue = QApplication::applicationFilePath().replace("/", "\\");
     const wchar_t* wcValue = reinterpret_cast<const wchar_t*>(tempValue.utf16());
-    int wlen = wcslen(wcValue) * 2;
+    int wlen = static_cast<int>(wcslen(wcValue)) * 2;
     char *pElementText = new char[wlen];
-    WideCharToMultiByte(CP_ACP, NULL, wcValue, -1, pElementText, wlen+2, NULL, NULL);
+    WideCharToMultiByte(CP_ACP, NULL, wcValue, -1, pElementText, wlen + 2, NULL, NULL);
 
     LONG lReg = RegSetValueExA(
                 phkResult,
@@ -129,9 +138,10 @@ void Widget::setAutoRun()
                 REG_SZ,
                 (unsigned char*)pElementText,
                 wlen);
-    setTip(lReg, "setAuto");
+    setTip(lReg, "set");
     delete [] pElementText;
     closeRegKey();
+    showKeyValue();
 }
 
 bool Widget::getAutoRun(QString *key, QString *value)
@@ -147,9 +157,9 @@ bool Widget::getAutoRun(QString *key, QString *value)
 
     LONG lReg = RegQueryValueExW(phkResult, wcKey, nullptr, &dwType, (LPBYTE)lpData, &cbData);
 
-    int wcLen = wcslen(lpData);
+    int wcLen = static_cast<int>(wcslen(lpData));
     QString tempValue = QString::fromUtf16(reinterpret_cast<const ushort *>(lpData), wcLen);
-    setTip(lReg, "getAuto");
+    setTip(lReg, "get");
     closeRegKey();
 
     if(lReg != ERROR_SUCCESS)
@@ -170,7 +180,8 @@ void Widget::cancelAutoRun()
     const wchar_t* wcKey = reinterpret_cast<const wchar_t*>(keyTemp.utf16());
 
     LONG lReg = RegDeleteKeyValueW(hKey, subKey, wcKey);
-    setTip(lReg, "cancelAuto");
+    setTip(lReg, "cancel");
     closeRegKey();
+    showKeyValue();
 }
 

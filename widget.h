@@ -21,6 +21,8 @@ public:
     bool isAutoRun();
 
 private:
+    void showKeyValue();
+
     void setTip(unsigned long error, const QString &tipHead = "");
 
     void setConnect();
